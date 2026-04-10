@@ -1,89 +1,142 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { ImageService } from './image/image.service';
 
 @Injectable()
 export class ListingsService {
-  constructor(private prisma: PrismaService) {}
+    constructor(
+        private prisma: PrismaService,
+        private imageService: ImageService
+    ) { }
 
-  // 🔥 CREATE LISTING
-  async create(userId: string, dto: any) {
-    return this.prisma.listing.create({
-      data: {
-        title: dto.title,
-        description: dto.description,
-        price: dto.price,
-        categoryId: dto.categoryId,
-        locationId: dto.locationId,
-        userId,
-      },
-    });
-  }
+    async uploadImages(listingId: string, files: Express.Multer.File[]) {
+        return this.imageService.uploadImages(listingId, files)
+    }
 
-  // 🔥 GET ALL LISTINGS (OLX STYLE FILTER)
-  async findAll(query: any) {
-    const page = Number(query.page) || 1;
-    const limit = Number(query.limit) || 10;
-    const skip = (page - 1) * limit;
+    // CREATE LISTING
+    async create(userId: string, dto: any) {
+        return this.prisma.listing.create({
+            data: {
+                title: dto.title,
+                description: dto.description,
+                price: dto.price,
+                categoryId: dto.categoryId,
+                locationId: dto.locationId,
+                userId,
+            },
+        });
+    }
 
-    return this.prisma.listing.findMany({
-      where: {
-        AND: [
-          query.search
-            ? {
-                title: {
-                  contains: query.search,
-                  mode: 'insensitive',
+    // GET ALL LISTINGS 
+    async findAll(query: any) {
+        const page = Number(query.page) || 1;
+        const limit = Number(query.limit) || 10;
+        const skip = (page - 1) * limit;
+
+        const [data, total] = await Promise.all([
+            this.prisma.listing.findMany({
+                where: {
+                    deletedAt: null,
                 },
-              }
-            : {},
-          query.categoryId ? { categoryId: query.categoryId } : {},
-          query.minPrice ? { price: { gte: Number(query.minPrice) } } : {},
-          query.maxPrice ? { price: { lte: Number(query.maxPrice) } } : {},
-        ],
-        deletedAt: null,
-      },
-      include: {
-        images: true,
-        user: true,
-        category: true,
-        location: true,
-      },
-      skip,
-      take: limit,
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
-  }
+                include: {
+                    images: true,
+                    category: true,
+                    location: true,
+                },
+                skip,
+                take: limit,
+                orderBy: {
+                    createdAt: 'desc',
+                },
+            }),
+            this.prisma.listing.count({
+                where: {
+                    deletedAt: null,
+                },
+            }),
+        ])
 
-  // 🔥 DETAIL LISTING
-  async findOne(id: string) {
-    return this.prisma.listing.findUnique({
-      where: { id },
-      include: {
-        images: true,
-        user: true,
-        category: true,
-        location: true,
-      },
-    });
-  }
+        return {
+            data,
+            meta: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit),
+            },
+        }
+    }
 
-  // 🔥 UPDATE
-  async update(id: string, dto: any) {
-    return this.prisma.listing.update({
-      where: { id },
-      data: dto,
-    });
-  }
+    // GET MY LISTINGS
+    async findMyListings(userId: string, query: any) {
+        const page = Number(query.page) || 1
+        const limit = Number(query.limit) || 10
+        const skip = (page - 1) * limit
 
-  // 🔥 DELETE (soft delete recommended)
-  async remove(id: string) {
-    return this.prisma.listing.update({
-      where: { id },
-      data: {
-        deletedAt: new Date(),
-      },
-    });
-  }
+        const [data, total] = await Promise.all([
+            this.prisma.listing.findMany({
+                where: {
+                    userId,
+                    deletedAt: null,
+                },
+                include: {
+                    images: true,
+                    category: true,
+                    location: true,
+                },
+                skip,
+                take: limit,
+                orderBy: {
+                    createdAt: 'desc',
+                },
+            }),
+            this.prisma.listing.count({
+                where: {
+                    userId,
+                    deletedAt: null,
+                },
+            }),
+        ])
+
+        return {
+            data,
+            meta: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit),
+            },
+        }
+    }
+
+    // DETAIL LISTING
+    async findOne(id: string) {
+        return this.prisma.listing.findUnique({
+            where: { id },
+            include: {
+                images: true,
+                user: true,
+                category: true,
+                location: true,
+            },
+        });
+    }
+
+    // UPDATE
+    async update(id: string, dto: any) {
+        return this.prisma.listing.update({
+            where: { id },
+            data: dto,
+        });
+    }
+
+    // DELETE (soft delete)
+    async remove(id: string) {
+        return this.prisma.listing.update({
+            where: { id },
+            data: {
+                deletedAt: new Date(),
+            },
+        });
+    }
 }
