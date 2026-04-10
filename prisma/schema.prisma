@@ -25,123 +25,125 @@ enum ListingStatus {
 }
 
 model User {
-  id              String   @id @default(uuid())
-  name            String
-  email           String   @unique
-  password        String
-  phone           String?
+  id       String  @id @default(uuid())
+  name     String
+  email    String  @unique
+  password String
+  phone    String?
 
-  role            UserRole @default(USER)
-  isVerified      Boolean  @default(false)
+  role       UserRole @default(USER)
+  isVerified Boolean  @default(false)
 
-  isShownPhone    Boolean  @default(false)
+  isShownPhone Boolean @default(false)
 
-  listings        Listing[]
-  favorites       Favorite[]
-  sentMessages    Message[] @relation("Sender")
-  receivedMessages Message[] @relation("Receiver")
+  listings         Listing[]
+  favorites        Favorite[]
+  sentMessages     Message[]  @relation("Sender")
+  receivedMessages Message[]  @relation("Receiver")
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  deletedAt       DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 }
 
 model Category {
-  id        String   @id @default(uuid())
-  name      String
-  slug      String   @unique
-  parentId  String?
+  id       String  @id @default(uuid())
+  name     String
+  slug     String  @unique
+  parentId String?
 
-  parent    Category? @relation("CategoryHierarchy", fields: [parentId], references: [id])
-  children  Category[] @relation("CategoryHierarchy")
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryHierarchy")
 
-  listings  Listing[]
+  listings Listing[]
 
   createdAt DateTime @default(now())
 }
 
 model Listing {
-  id            String        @id @default(uuid())
-  title         String
-  description   String
-  price         Float
-  status        ListingStatus @default(DRAFT)
+  id          String        @id @default(uuid())
+  title       String
+  description String
+  price       Float
+  status      ListingStatus @default(DRAFT)
 
-  userId        String
-  categoryId    String
-  locationId    String?
+  userId     String
+  categoryId String
+  locationId String?
 
-  viewsCount    Int           @default(0)
+  viewsCount Int @default(0)
 
-  user          User          @relation(fields: [userId], references: [id])
-  category      Category      @relation(fields: [categoryId], references: [id])
-  location      Location?     @relation(fields: [locationId], references: [id])
+  user     User      @relation(fields: [userId], references: [id])
+  category Category  @relation(fields: [categoryId], references: [id])
+  location Location? @relation(fields: [locationId], references: [id])
 
-  images        Image[]
-  favorites     Favorite[]
-  attributes    ListingAttribute[]
+  messages Message[]
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  deletedAt     DateTime?
+  images     Image[]
+  favorites  Favorite[]
+  attributes ListingAttribute[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 }
 
 model Image {
-  id         String   @id @default(uuid())
-  url        String
-  isPrimary  Boolean  @default(false)
-  listingId  String
+  id        String  @id @default(uuid())
+  url       String
+  isPrimary Boolean @default(false)
+  listingId String
 
-  listing    Listing  @relation(fields: [listingId], references: [id])
+  listing Listing @relation(fields: [listingId], references: [id])
 
-  createdAt  DateTime @default(now())
+  createdAt DateTime @default(now())
 }
 
 model Favorite {
-  id         String @id @default(uuid())
-  userId     String
-  listingId  String
+  id        String @id @default(uuid())
+  userId    String
+  listingId String
 
-  user       User    @relation(fields: [userId], references: [id])
-  listing    Listing @relation(fields: [listingId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+  listing Listing @relation(fields: [listingId], references: [id])
 
-  createdAt  DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@unique([userId, listingId]) // prevent duplicate favorite
 }
 
 model Location {
-  id        String   @id @default(uuid())
+  id        String  @id @default(uuid())
   province  String
   city      String
   district  String?
   latitude  Float?
   longitude Float?
 
-  listings  Listing[]
+  listings Listing[]
 }
 
 model Message {
-  id          String @id @default(uuid())
-  senderId    String
-  receiverId  String
-  listingId   String?
+  id         String  @id @default(uuid())
+  senderId   String
+  receiverId String
+  listingId  String?
 
-  content     String
-  isRead      Boolean @default(false)
+  content String
+  isRead  Boolean @default(false)
 
-  sender      User @relation("Sender", fields: [senderId], references: [id])
-  receiver    User @relation("Receiver", fields: [receiverId], references: [id])
-  listing     Listing? @relation(fields: [listingId], references: [id])
+  sender   User     @relation("Sender", fields: [senderId], references: [id])
+  receiver User     @relation("Receiver", fields: [receiverId], references: [id])
+  listing  Listing? @relation(fields: [listingId], references: [id])
 
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
 }
 
 model ListingAttribute {
-  id          String @id @default(uuid())
-  listingId   String
-  key         String
-  value       String
+  id        String @id @default(uuid())
+  listingId String
+  key       String
+  value     String
 
-  listing     Listing @relation(fields: [listingId], references: [id])
+  listing Listing @relation(fields: [listingId], references: [id])
 }
