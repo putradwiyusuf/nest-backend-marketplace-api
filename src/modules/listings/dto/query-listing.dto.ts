@@ -1,22 +1,23 @@
-import { IsOptional, IsString } from 'class-validator';
+/* eslint-disable prettier/prettier */
+import { IsOptional, IsString } from 'class-validator'
 
 export class QueryListingDto {
   @IsOptional()
   @IsString()
-  search?: string;
+  search?: string
 
   @IsOptional()
-  categoryId?: string;
+  categoryId?: string
 
   @IsOptional()
-  minPrice?: number;
+  minPrice?: number
 
   @IsOptional()
-  maxPrice?: number;
+  maxPrice?: number
 
   @IsOptional()
-  page?: number;
+  page?: number
 
   @IsOptional()
-  limit?: number;
+  limit?: number
 }
