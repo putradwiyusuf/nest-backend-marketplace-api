@@ -9,10 +9,11 @@ import {
     UploadedFiles,
     UseGuards,
     ForbiddenException,
+    UseInterceptors,
 } from '@nestjs/common';
 import { ListingsService } from './listings.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { ImageService } from './image/image.service';
+import { FilesInterceptor } from '@nestjs/platform-express';
 
 @Controller('listings')
 export class ListingsController {
