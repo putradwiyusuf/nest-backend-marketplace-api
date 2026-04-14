@@ -11,6 +11,7 @@ import {
     ForbiddenException,
     UseInterceptors,
     Patch,
+    Delete,
 } from '@nestjs/common';
 import { ListingsService } from './listings.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -18,6 +19,8 @@ import { FilesInterceptor } from '@nestjs/platform-express';
 import { CreateListingDto } from './dto/create-listing.dto';
 import { UpdateListingDto } from './dto/update-listing.dto';
 import { QueryListingDto } from './dto/query-listing.dto';
+import { RolesGuard } from 'src/common/guards/roles.guard';
+import { Roles } from 'src/common/decorators/roles.decorator';
 
 @Controller('listings')
 export class ListingsController {
@@ -64,13 +67,13 @@ export class ListingsController {
         @Req() req,
         @Body() dto: UpdateListingDto,
     ) {
-        return this.listingsService.update(id, dto, req.user.userId)
+        return this.listingsService.update(id, dto, req.user)
     }
 
     @UseGuards(JwtAuthGuard)
     @Post(':id/delete')
     remove(@Param('id') id: string, @Req() req) {
-        return this.listingsService.remove(id, req.user.userId)
+        return this.listingsService.remove(id, req.user)
     }
 
     // UPLOAD IMAGES
@@ -82,7 +85,13 @@ export class ListingsController {
         @UploadedFiles() files: Express.Multer.File[],
         @Req() req: any
     ) {
-        return this.listingsService.uploadImages(listingId, files, req.user.userId)
+        return this.listingsService.uploadImages(listingId, files, req.user)
     }
 
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('ADMIN', 'SUPERADMIN')
+    @Delete(':id/force')
+    forceDelete(@Param('id') id: string) {
+        return this.listingsService.forceDelete(id)
+    }
 }

@@ -6,10 +6,8 @@ import { QueryListingDto } from './dto/query-listing.dto';
 import { CreateListingDto } from './dto/create-listing.dto';
 import { UpdateListingDto } from './dto/update-listing.dto';
 import { Prisma } from '@prisma/client';
-import { checkListingOwnership } from 'src/common/helpers/ownership.helper'
+import { checkListingAccess } from 'src/common/helpers/ownership.helper'
 import {
-    BadRequestException,
-    ForbiddenException,
     NotFoundException,
 } from '@nestjs/common'
 
@@ -226,8 +224,8 @@ export class ListingsService {
     }
 
     // UPDATE
-    async update(id: string, dto: UpdateListingDto, userId: string) {
-        await checkListingOwnership(this.prisma, id, userId)
+    async update(id: string, dto: UpdateListingDto, user: any) {
+        await checkListingAccess(this.prisma, id, user)
 
         return this.prisma.listing.update({
             where: { id },
@@ -236,8 +234,8 @@ export class ListingsService {
     }
 
     // DELETE (soft delete)
-    async remove(id: string, userId: string) {
-        await checkListingOwnership(this.prisma, id, userId)
+    async remove(id: string, user: any) {
+        await checkListingAccess(this.prisma, id, user)
 
         await this.prisma.listing.update({
             where: { id },
@@ -247,5 +245,15 @@ export class ListingsService {
         })
 
         return { message: 'Listing deleted' }
+    }
+
+    async forceDelete(id: string) {
+        await this.prisma.listing.delete({
+            where: { id },
+        })
+
+        return {
+            message: 'Listing permanently deleted',
+        }
     }
 }

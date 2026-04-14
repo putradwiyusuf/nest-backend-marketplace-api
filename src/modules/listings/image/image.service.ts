@@ -11,7 +11,7 @@ import { join } from 'path'
 import { randomUUID } from 'crypto'
 import sharp from 'sharp'
 import { Prisma } from '@prisma/client'
-import { checkListingOwnership } from 'src/common/helpers/ownership.helper'
+import { checkListingAccess } from 'src/common/helpers/ownership.helper'
 import {
     BadRequestException,
     NotFoundException,
@@ -24,13 +24,13 @@ export class ImageService {
     async uploadImages(
         listingId: string,
         files: Express.Multer.File[],
-        userId: string,
+        user: any,
     ) {
         if (files.length === 0) {
             throw new BadRequestException('No files uploaded')
         }
 
-        await checkListingOwnership(this.prisma, listingId, userId)
+        await checkListingAccess(this.prisma, listingId, user)
 
         const count = await this.prisma.image.count({
             where: { listingId },
@@ -80,7 +80,7 @@ export class ImageService {
         }))
     }
 
-    async deleteImage(imageId: string, userId: string) {
+    async deleteImage(imageId: string, user: any) {
         return this.prisma.$transaction(async (tx) => {
             const image = await tx.image.findUnique({
                 where: { id: imageId },
@@ -91,7 +91,7 @@ export class ImageService {
                 throw new NotFoundException('Image not found')
             }
 
-            await checkListingOwnership(this.prisma, image.listingId, userId)
+            await checkListingAccess(this.prisma, image.listingId, user)
 
             // hapus file
             const filename = image.url.split('/').pop()
@@ -121,7 +121,7 @@ export class ImageService {
         })
     }
 
-    async setPrimary(imageId: string, userId: string) {
+    async setPrimary(imageId: string, user: any) {
         const image = await this.prisma.image.findUnique({
             where: { id: imageId },
             include: { listing: true },
@@ -133,7 +133,7 @@ export class ImageService {
 
         const listingId = image.listingId
 
-        await checkListingOwnership(this.prisma, listingId, userId)
+        await checkListingAccess(this.prisma, listingId, user)
 
         await this.prisma.image.updateMany({
             where: { listingId },

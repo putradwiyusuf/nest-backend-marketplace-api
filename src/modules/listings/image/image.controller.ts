@@ -23,11 +23,11 @@ export class ImageController {
 
     @Delete(':id')
     delete(@Param('id') id: string, @Req() req) {
-        return this.imageService.deleteImage(id, req.user.userId)
+        return this.imageService.deleteImage(id, req.user)
     }
 
     @Patch(':id/primary')
     setPrimary(@Param('id') id: string, @Req() req) {
-        return this.imageService.setPrimary(id, req.user.userId)
+        return this.imageService.setPrimary(id, req.user)
     }
 }

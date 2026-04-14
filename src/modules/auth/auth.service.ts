@@ -51,7 +51,7 @@ export class AuthService {
 
     if (!isMatch) throw new UnauthorizedException('Invalid credentials')
 
-    const token = this.generateToken(user.id, user.email)
+    const token = this.generateToken(user.id, user.email, user.role)
     return {
       token,
       user: {
@@ -60,15 +60,17 @@ export class AuthService {
         email: user.email,
         phone: user.phone,
         isShownPhone: user.isShownPhone,
+        role: user.role,
       },
     }
   }
 
-  private generateToken(userId: string, email: string) {
+  private generateToken(userId: string, email: string, role?: string) {
     return {
       access_token: this.jwt.sign({
         sub: userId,
         email,
+        role
       }),
     }
   }

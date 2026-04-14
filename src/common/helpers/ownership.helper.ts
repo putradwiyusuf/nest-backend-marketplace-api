@@ -4,10 +4,10 @@ import {
 } from '@nestjs/common'
 import { PrismaService } from 'src/prisma/prisma.service'
 
-export async function checkListingOwnership(
+export async function checkListingAccess(
     prisma: PrismaService,
     listingId: string,
-    userId: string,
+    user: { userId: string; role: string },
 ) {
     const listing = await prisma.listing.findUnique({
         where: { id: listingId },
@@ -17,7 +17,12 @@ export async function checkListingOwnership(
         throw new NotFoundException('Listing not found')
     }
 
-    if (listing.userId !== userId) {
+    // 🔥 ADMIN BYPASS
+    if (user.role === 'ADMIN' || user.role === 'SUPERADMIN') {
+        return listing
+    }
+
+    if (listing.userId !== user.userId) {
         throw new ForbiddenException('Access denied')
     }
 
