@@ -10,10 +10,14 @@ import {
     UseGuards,
     ForbiddenException,
     UseInterceptors,
+    Patch,
 } from '@nestjs/common';
 import { ListingsService } from './listings.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { FilesInterceptor } from '@nestjs/platform-express';
+import { CreateListingDto } from './dto/create-listing.dto';
+import { UpdateListingDto } from './dto/update-listing.dto';
+import { QueryListingDto } from './dto/query-listing.dto';
 
 @Controller('listings')
 export class ListingsController {
@@ -37,7 +41,7 @@ export class ListingsController {
 
     // PUBLIC
     @Get()
-    findAll(@Query() query: any) {
+    findAll(@Query() query: QueryListingDto) {
         return this.listingsService.findAll(query);
     }
 
@@ -47,16 +51,20 @@ export class ListingsController {
     }
 
     // PROTECTED
-    @UseGuards(JwtAuthGuard)
     @Post()
-    create(@Req() req, @Body() dto: any) {
-        return this.listingsService.create(req.user.userId, dto);
+    @UseGuards(JwtAuthGuard)
+    create(@Req() req, @Body() dto: CreateListingDto) {
+        return this.listingsService.create(req.user.userId, dto)
     }
 
+    @Patch(':id')
     @UseGuards(JwtAuthGuard)
-    @Post(':id')
-    update(@Param('id') id: string, @Body() dto: any) {
-        return this.listingsService.update(id, dto);
+    update(
+        @Param('id') id: string,
+        @Req() req,
+        @Body() dto: UpdateListingDto,
+    ) {
+        return this.listingsService.update(id, dto, req.user.userId)
     }
 
     @UseGuards(JwtAuthGuard)

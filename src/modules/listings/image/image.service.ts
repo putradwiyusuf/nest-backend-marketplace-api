@@ -11,6 +11,11 @@ import { join } from 'path'
 import { randomUUID } from 'crypto'
 import sharp from 'sharp'
 import { Prisma } from '@prisma/client'
+import {
+    BadRequestException,
+    ForbiddenException,
+    NotFoundException,
+} from '@nestjs/common'
 
 @Injectable()
 export class ImageService {
@@ -22,21 +27,35 @@ export class ImageService {
         })
 
         if (!listing || listing.userId !== userId) {
-            throw new Error('Unauthorized')
+            throw new ForbiddenException('Unauthorized')
         }
 
         return listing
     }
 
-    async uploadImages(listingId: string, files: Express.Multer.File[], userId: string) {
-        await this.validateOwnership(listingId, userId)
+    async uploadImages(
+        listingId: string,
+        files: Express.Multer.File[],
+        userId: string,
+    ) {
+        const listing = await this.prisma.listing.findUnique({
+            where: { id: listingId },
+        })
 
-        const existingCount = await this.prisma.image.count({
+        if (!listing) {
+            throw new NotFoundException('Listing not found')
+        }
+
+        if (listing.userId !== userId) {
+            throw new ForbiddenException('Unauthorized')
+        }
+
+        const count = await this.prisma.image.count({
             where: { listingId },
         })
 
-        if (existingCount + files.length > 10) {
-            throw new Error('Max 10 images per listing')
+        if (count + files.length > 10) {
+            throw new BadRequestException('Max 10 images per listing')
         }
 
         const hasPrimary = await this.prisma.image.findFirst({
@@ -63,34 +82,57 @@ export class ImageService {
             })
         }
 
-        return this.prisma.image.createMany({
-            data: imageData,
+        await this.prisma.image.createMany({ data: imageData })
+
+        return this.prisma.image.findMany({
+            where: { listingId },
+            orderBy: { isPrimary: 'desc' },
         })
     }
 
     async deleteImage(imageId: string, userId: string) {
-        const image = await this.prisma.image.findUnique({
-            where: { id: imageId },
-            include: { listing: true },
-        })
+        return this.prisma.$transaction(async (tx) => {
+            const image = await tx.image.findUnique({
+                where: { id: imageId },
+                include: { listing: true },
+            })
 
-        if (!image || image.listing.userId !== userId) {
-            throw new Error('Unauthorized')
-        }
+            if (!image) {
+                throw new NotFoundException('Image not found')
+            }
 
-        // hapus file
-        const filename = image.url.split('/').pop()
+            if (image.listing.userId !== userId) {
+                throw new ForbiddenException('Unauthorized')
+            }
 
-        if (!filename) {
-            throw new Error('Invalid filename')
-        }
+            // hapus file
+            const filename = image.url.split('/').pop()
+            if (filename) {
+                const filepath = join(process.cwd(), 'uploads', filename)
+                await fs.unlink(filepath).catch(() => { })
+            }
 
-        const filepath = join(process.cwd(), 'uploads', filename)
+            // hapus dari DB
+            const deleted = await tx.image.delete({
+                where: { id: imageId },
+            })
 
-        await fs.unlink(filepath).catch(() => { })
+            // 🔥 kalau dia primary → assign baru
+            if (image.isPrimary) {
+                const nextImage = await tx.image.findFirst({
+                    where: { listingId: image.listingId },
+                    orderBy: { createdAt: 'asc' },
+                })
 
-        return this.prisma.image.delete({
-            where: { id: imageId },
+                if (nextImage) {
+                    await tx.image.update({
+                        where: { id: nextImage.id },
+                        data: { isPrimary: true },
+                    })
+                }
+            }
+
+            return { message: 'Image deleted' }
         })
     }
 

@@ -1,18 +1,19 @@
-import { IsString, IsNumber, IsOptional } from 'class-validator';
+/* eslint-disable prettier/prettier */
+import { IsString, IsNumber, IsOptional } from 'class-validator'
 
 export class CreateListingDto {
   @IsString()
-  title!: string;
+  title!: string
 
   @IsString()
-  description!: string;
+  description!: string
 
   @IsNumber()
-  price!: number;
+  price!: number
 
   @IsString()
-  categoryId!: string;
+  categoryId!: string
 
   @IsOptional()
-  locationId?: string;
+  locationId?: string
 }
