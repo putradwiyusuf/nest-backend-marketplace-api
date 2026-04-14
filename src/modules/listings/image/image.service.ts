@@ -105,7 +105,7 @@ export class ImageService {
                 where: { id: imageId },
             })
 
-            // 🔥 kalau dia primary → assign baru
+            // kalau dia primary → assign baru
             const remaining = await this.prisma.image.findMany({
                 where: { listingId: image.listing.id },
             })

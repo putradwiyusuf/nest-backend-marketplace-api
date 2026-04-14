@@ -1,84 +1,89 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from 'src/prisma/prisma.service';
-import { ImageService } from './image/image.service';
-import { QueryListingDto } from './dto/query-listing.dto';
-import { CreateListingDto } from './dto/create-listing.dto';
-import { UpdateListingDto } from './dto/update-listing.dto';
-import { Prisma } from '@prisma/client';
-import { checkListingAccess } from 'src/common/helpers/ownership.helper'
 import {
+    Injectable,
     NotFoundException,
 } from '@nestjs/common'
-
+import { PrismaService } from 'src/prisma/prisma.service'
+import { ImageService } from './image/image.service'
+import { QueryListingDto } from './dto/query-listing.dto'
+import { CreateListingDto } from './dto/create-listing.dto'
+import { UpdateListingDto } from './dto/update-listing.dto'
+import { Prisma } from '@prisma/client'
+import { checkListingAccess } from 'src/common/helpers/ownership.helper'
+import { JwtUser } from 'src/common/types/jwt-user.type'
+import { mapListing, mapListingDetail } from 'src/common/mappers/listing.mapper'
+import { PaginatedListingResponseDto } from './dto/responses/paginated-listing.response'
+import { ListingDetailResponseDto } from './dto/responses/listing-detail.response'
 
 @Injectable()
 export class ListingsService {
     constructor(
         private prisma: PrismaService,
-        private imageService: ImageService
+        private imageService: ImageService,
     ) { }
 
-    async uploadImages(listingId: string, files: Express.Multer.File[], userId: string) {
-        return this.imageService.uploadImages(listingId, files, userId)
-    }
-    // CREATE LISTING
+    //CREATE
     async create(userId: string, dto: CreateListingDto) {
-        const listing = await this.prisma.listing.create({
+        return this.prisma.listing.create({
             data: {
-                title: dto.title,
-                description: dto.description,
-                price: dto.price,
-                categoryId: dto.categoryId,
-                locationId: dto.locationId,
+                ...dto,
                 userId,
             },
         })
-
-        return listing
     }
 
-    async findAll(query: QueryListingDto) {
-        const page = query.page || 1
-        const limit = query.limit || 10
+    //UPLOAD IMAGE
+    async uploadImages(
+        listingId: string,
+        files: Express.Multer.File[],
+        user: JwtUser,
+    ) {
+        return this.imageService.uploadImages(listingId, files, user)
+    }
+
+    //FIND ALL
+    async findAll(query: QueryListingDto): Promise<PaginatedListingResponseDto> {
+        const {
+            page = 1,
+            limit = 10,
+            search,
+            categoryId,
+            minPrice,
+            maxPrice,
+        } = query
+
         const skip = (page - 1) * limit
 
         const where: Prisma.ListingWhereInput = {
             deletedAt: null,
-        }
 
-        // 🔍 SEARCH
-        if (query.search) {
-            where.OR = [
-                {
-                    title: {
-                        contains: query.search,
-                        mode: Prisma.QueryMode.insensitive,
+            ...(search && {
+                OR: [
+                    {
+                        title: {
+                            contains: search,
+                            mode: Prisma.QueryMode.insensitive,
+                        },
                     },
-                },
-                {
-                    description: {
-                        contains: query.search,
-                        mode: Prisma.QueryMode.insensitive,
+                    {
+                        description: {
+                            contains: search,
+                            mode: Prisma.QueryMode.insensitive,
+                        },
                     },
-                },
-            ]
-        }
+                ],
+            }),
 
-        // 🏷️ CATEGORY
-        if (query.categoryId) {
-            where.categoryId = query.categoryId
-        }
+            ...(categoryId && { categoryId }),
 
-        // 💰 PRICE
-        if (query.minPrice || query.maxPrice) {
-            where.price = {}
-            if (query.minPrice) {
-                where.price.gte = query.minPrice
-            }
-            if (query.maxPrice) {
-                where.price.lte = query.maxPrice
-            }
+            ...(minPrice || maxPrice
+                ? {
+                    price: {
+                        ...(minPrice && { gte: minPrice }),
+                        ...(maxPrice && { lte: maxPrice }),
+                    },
+                }
+                : {}),
         }
 
         const [listings, total] = await Promise.all([
@@ -87,6 +92,7 @@ export class ListingsService {
                 include: {
                     images: true,
                     location: true,
+                    category: true,
                 },
                 skip,
                 take: limit,
@@ -95,24 +101,8 @@ export class ListingsService {
             this.prisma.listing.count({ where }),
         ])
 
-        const data = listings.map((item) => {
-            const primary = item.images.find((img) => img.isPrimary)
-
-            return {
-                id: item.id,
-                title: item.title,
-                price: item.price,
-                thumbnail: primary?.url || '/uploads/default.webp',
-                location: item.location
-                    ? `${item.location.city}, ${item.location.province}`
-                    : null,
-                createdAt: item.createdAt,
-                viewsCount: item.viewsCount,
-            }
-        })
-
         return {
-            data,
+            data: listings.map((item) => mapListing(item)),
             meta: {
                 page,
                 limit,
@@ -122,13 +112,15 @@ export class ListingsService {
         }
     }
 
-    // GET MY LISTINGS
-    async findMyListings(userId: string, query: any) {
-        const page = Number(query.page) || 1
-        const limit = Number(query.limit) || 10
+    //MY LISTINGS
+    async findMyListings(
+        userId: string,
+        query: QueryListingDto,
+    ): Promise<PaginatedListingResponseDto> {
+        const { page = 1, limit = 10 } = query
         const skip = (page - 1) * limit
 
-        const [data, total] = await Promise.all([
+        const [listings, total] = await Promise.all([
             this.prisma.listing.findMany({
                 where: {
                     userId,
@@ -136,14 +128,12 @@ export class ListingsService {
                 },
                 include: {
                     images: true,
-                    category: true,
                     location: true,
+                    category: true,
                 },
                 skip,
                 take: limit,
-                orderBy: {
-                    createdAt: 'desc',
-                },
+                orderBy: { createdAt: 'desc' },
             }),
             this.prisma.listing.count({
                 where: {
@@ -154,7 +144,7 @@ export class ListingsService {
         ])
 
         return {
-            data,
+            data: listings.map((item) => mapListing(item)),
             meta: {
                 page,
                 limit,
@@ -164,8 +154,9 @@ export class ListingsService {
         }
     }
 
-    // DETAIL LISTING
-    async findOne(id: string) {
+    //DETAIL LISTING
+    async findOne(id: string): Promise<ListingDetailResponseDto> {
+
         const existing = await this.prisma.listing.findUnique({
             where: { id },
         })
@@ -180,51 +171,18 @@ export class ListingsService {
                 viewsCount: { increment: 1 },
             },
             include: {
-                images: {
-                    orderBy: { isPrimary: 'desc' },
-                },
+                images: { orderBy: { isPrimary: 'desc' } },
                 user: true,
                 location: true,
                 category: true,
             },
         })
 
-
-        if (!listing || listing.deletedAt) {
-            throw new NotFoundException('Listing not found')
-        }
-
-        const primary = listing.images[0]
-
-
-        return {
-            id: listing.id,
-            title: listing.title,
-            description: listing.description,
-            price: listing.price,
-
-            thumbnail: primary?.url || '/uploads/default.webp',
-            gallery: listing.images.map((img) => img.url),
-
-            user: {
-                id: listing.user.id,
-                name: listing.user.name,
-                phone: listing.user.isShownPhone
-                    ? listing.user.phone
-                    : null,
-            },
-            location: listing.location
-                ? `${listing.location.city}, ${listing.location.province}`
-                : null,
-            category: listing.category?.name || null,
-
-            viewsCount: listing.viewsCount,
-            createdAt: listing.createdAt,
-        }
+        return mapListingDetail(listing)
     }
 
-    // UPDATE
-    async update(id: string, dto: UpdateListingDto, user: any) {
+    //UPDATE
+    async update(id: string, dto: UpdateListingDto, user: JwtUser) {
         await checkListingAccess(this.prisma, id, user)
 
         return this.prisma.listing.update({
@@ -233,8 +191,8 @@ export class ListingsService {
         })
     }
 
-    // DELETE (soft delete)
-    async remove(id: string, user: any) {
+    //DELETE (SOFT)
+    async remove(id: string, user: JwtUser) {
         await checkListingAccess(this.prisma, id, user)
 
         await this.prisma.listing.update({
@@ -247,6 +205,7 @@ export class ListingsService {
         return { message: 'Listing deleted' }
     }
 
+    //DELETE PERMANENT (ADMIN)
     async forceDelete(id: string) {
         await this.prisma.listing.delete({
             where: { id },

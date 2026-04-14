@@ -16,24 +16,38 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
         let status = HttpStatus.INTERNAL_SERVER_ERROR
         let message = 'Internal server error'
+        let errors = null
 
+        // HANDLE NEST HTTP EXCEPTION
         if (exception instanceof HttpException) {
             status = exception.getStatus()
-
             const res = exception.getResponse()
 
             if (typeof res === 'string') {
                 message = res
-            } else if (typeof res === 'object') {
-                message = (res as any).message || message
+            } else {
+                const r = res as any
+                message = r.message || message
+                errors = r.errors || null
             }
+        }
+
+        // HANDLE PRISMA ERROR (basic safe mapping)
+        if ((exception as any)?.code === 'P2002') {
+            status = HttpStatus.CONFLICT
+            message = 'Duplicate entry'
+        }
+
+        if ((exception as any)?.code === 'P2025') {
+            status = HttpStatus.NOT_FOUND
+            message = 'Record not found'
         }
 
         response.status(status).json({
             success: false,
             statusCode: status,
             message,
-            errors: null,
+            errors,
             timestamp: new Date().toISOString(),
             path: request.url,
         })
