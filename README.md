@@ -49,15 +49,16 @@ Backend API marketplace seperti OLX menggunakan NestJS + Prisma + PostgreSQL.
 
 ## 1. Clone project
 
-````bash
+```bash
 git clone https://github.com/your-username/nest-backend-marketplace-api.git
 cd nest-backend-marketplace-api
-
----
+```
 
 ## 2. Install dependencies
-``` bash
+
+```bash
 npm install
+```
 
 ---
 
@@ -72,34 +73,42 @@ Buat file .env
 ---
 
 ## 4. Setup database (Prisma)
-``` bash
+
+```bash
 npx prisma generate
 npx prisma migrate dev
+```
 
 (Optional seed)
-``` bash
+
+```bash
 npx prisma db seed
+```
 
 ---
 
 ## 5. Create uploads folder
-``` bash
+
+```bash
 mkdir uploads
+```
 
 ---
 
 # ▶️ Running Project
 
 ## Development
-``` bash
+
+```bash
 npm run start:dev
+```
 
 ## Production
-``` bash
+
+```bash
 npm run build
 npm run start:prod
-
----
+```
 
 # 📌 API Base URL
 
@@ -110,14 +119,14 @@ http://localhost:3000
 # 📦 API Endpoints
 
 ## Auth
-``` bash
+
 POST /auth/register
 POST /auth/login
 
 ---
 
 ## Listings
-``` bash
+
 GET /listings
 GET /listings/:id
 POST /listings
@@ -127,13 +136,15 @@ DELETE /listings/:id
 ---
 
 ## My Listings
-``` bash
+
+````
+```bash
 GET /listings/user/me
 
 ---
 
 ## Images
-``` bash
+```bash
 POST /listings/:id/images
 DELETE /images/:id
 
@@ -233,4 +244,3 @@ Built with NestJS for scalable marketplace backend system.
 # ⚠️ Disclaimer
 
 Project ini masih dalam tahap development aktif dan akan terus berkembang.
-````
