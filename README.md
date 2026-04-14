@@ -137,14 +137,12 @@ DELETE /listings/:id
 
 ## My Listings
 
-````
-```bash
 GET /listings/user/me
 
 ---
 
 ## Images
-```bash
+
 POST /listings/:id/images
 DELETE /images/:id
 
