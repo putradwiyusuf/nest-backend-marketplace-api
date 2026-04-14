@@ -11,9 +11,9 @@ import { join } from 'path'
 import { randomUUID } from 'crypto'
 import sharp from 'sharp'
 import { Prisma } from '@prisma/client'
+import { checkListingOwnership } from 'src/common/helpers/ownership.helper'
 import {
     BadRequestException,
-    ForbiddenException,
     NotFoundException,
 } from '@nestjs/common'
 
@@ -21,34 +21,16 @@ import {
 export class ImageService {
     constructor(private prisma: PrismaService) { }
 
-    async validateOwnership(listingId: string, userId: string) {
-        const listing = await this.prisma.listing.findUnique({
-            where: { id: listingId },
-        })
-
-        if (!listing || listing.userId !== userId) {
-            throw new ForbiddenException('Unauthorized')
-        }
-
-        return listing
-    }
-
     async uploadImages(
         listingId: string,
         files: Express.Multer.File[],
         userId: string,
     ) {
-        const listing = await this.prisma.listing.findUnique({
-            where: { id: listingId },
-        })
-
-        if (!listing) {
-            throw new NotFoundException('Listing not found')
+        if (files.length === 0) {
+            throw new BadRequestException('No files uploaded')
         }
 
-        if (listing.userId !== userId) {
-            throw new ForbiddenException('Unauthorized')
-        }
+        await checkListingOwnership(this.prisma, listingId, userId)
 
         const count = await this.prisma.image.count({
             where: { listingId },
@@ -66,7 +48,9 @@ export class ImageService {
 
         for (let i = 0; i < files.length; i++) {
             const file = files[i]
-
+            if (!file.mimetype.startsWith('image/')) {
+                throw new BadRequestException('Invalid file type')
+            }
             const filename = `${randomUUID()}.webp`
             const filepath = join(process.cwd(), 'uploads', filename)
 
@@ -107,9 +91,7 @@ export class ImageService {
                 throw new NotFoundException('Image not found')
             }
 
-            if (image.listing.userId !== userId) {
-                throw new ForbiddenException('Unauthorized')
-            }
+            await checkListingOwnership(this.prisma, image.listingId, userId)
 
             // hapus file
             const filename = image.url.split('/').pop()
@@ -124,18 +106,15 @@ export class ImageService {
             })
 
             // 🔥 kalau dia primary → assign baru
-            if (image.isPrimary) {
-                const nextImage = await tx.image.findFirst({
-                    where: { listingId: image.listingId },
-                    orderBy: { createdAt: 'asc' },
-                })
+            const remaining = await this.prisma.image.findMany({
+                where: { listingId: image.listing.id },
+            })
 
-                if (nextImage) {
-                    await tx.image.update({
-                        where: { id: nextImage.id },
-                        data: { isPrimary: true },
-                    })
-                }
+            if (remaining.length > 0 && !remaining.some(i => i.isPrimary)) {
+                await this.prisma.image.update({
+                    where: { id: remaining[0].id },
+                    data: { isPrimary: true },
+                })
             }
 
             return { message: 'Image deleted' }
@@ -148,11 +127,13 @@ export class ImageService {
             include: { listing: true },
         })
 
-        if (!image || image.listing.userId !== userId) {
-            throw new Error('Unauthorized')
+        if (!image) {
+            throw new NotFoundException('Image not found')
         }
 
         const listingId = image.listingId
+
+        await checkListingOwnership(this.prisma, listingId, userId)
 
         await this.prisma.image.updateMany({
             where: { listingId },

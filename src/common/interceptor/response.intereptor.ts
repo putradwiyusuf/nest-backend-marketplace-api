@@ -19,6 +19,23 @@ export class ResponseInterceptor implements NestInterceptor {
                     data,
                     meta: null,
                 }
+            }), map((data) => {
+                if (data?.success !== undefined) return data
+
+                // 🔥 FIX: kalau ada data + meta
+                if (data?.data && data?.meta) {
+                    return {
+                        success: true,
+                        data: data.data,
+                        meta: data.meta,
+                    }
+                }
+
+                return {
+                    success: true,
+                    data,
+                    meta: null,
+                }
             }),
         )
     }

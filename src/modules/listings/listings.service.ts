@@ -6,6 +6,7 @@ import { QueryListingDto } from './dto/query-listing.dto';
 import { CreateListingDto } from './dto/create-listing.dto';
 import { UpdateListingDto } from './dto/update-listing.dto';
 import { Prisma } from '@prisma/client';
+import { checkListingOwnership } from 'src/common/helpers/ownership.helper'
 import {
     BadRequestException,
     ForbiddenException,
@@ -167,6 +168,14 @@ export class ListingsService {
 
     // DETAIL LISTING
     async findOne(id: string) {
+        const existing = await this.prisma.listing.findUnique({
+            where: { id },
+        })
+
+        if (!existing || existing.deletedAt) {
+            throw new NotFoundException('Listing not found')
+        }
+
         const listing = await this.prisma.listing.update({
             where: { id },
             data: {
@@ -181,6 +190,7 @@ export class ListingsService {
                 category: true,
             },
         })
+
 
         if (!listing || listing.deletedAt) {
             throw new NotFoundException('Listing not found')
@@ -217,16 +227,25 @@ export class ListingsService {
 
     // UPDATE
     async update(id: string, dto: UpdateListingDto, userId: string) {
+        await checkListingOwnership(this.prisma, id, userId)
+
         return this.prisma.listing.update({
             where: { id },
             data: dto,
-        });
+        })
     }
 
     // DELETE (soft delete)
-    async remove(id: string) {
-        return {
-            message: 'Listing deleted',
-        }
+    async remove(id: string, userId: string) {
+        await checkListingOwnership(this.prisma, id, userId)
+
+        await this.prisma.listing.update({
+            where: { id },
+            data: {
+                deletedAt: new Date(),
+            },
+        })
+
+        return { message: 'Listing deleted' }
     }
 }

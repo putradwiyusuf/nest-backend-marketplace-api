@@ -69,8 +69,8 @@ export class ListingsController {
 
     @UseGuards(JwtAuthGuard)
     @Post(':id/delete')
-    remove(@Param('id') id: string) {
-        return this.listingsService.remove(id);
+    remove(@Param('id') id: string, @Req() req) {
+        return this.listingsService.remove(id, req.user.userId)
     }
 
     // UPLOAD IMAGES
