@@ -72,8 +72,9 @@ export class ListingsController {
     uploadImages(
         @Param('id') listingId: string,
         @UploadedFiles() files: Express.Multer.File[],
+        @Req() req: any
     ) {
-        return this.listingsService.uploadImages(listingId, files)
+        return this.listingsService.uploadImages(listingId, files, req.user.userId)
     }
 
 }

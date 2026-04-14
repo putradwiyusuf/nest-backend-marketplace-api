@@ -9,10 +9,9 @@ export class ListingsService {
         private imageService: ImageService
     ) { }
 
-    async uploadImages(listingId: string, files: Express.Multer.File[]) {
-        return this.imageService.uploadImages(listingId, files)
+    async uploadImages(listingId: string, files: Express.Multer.File[], userId: string) {
+        return this.imageService.uploadImages(listingId, files, userId)
     }
-
     // CREATE LISTING
     async create(userId: string, dto: any) {
         return this.prisma.listing.create({
