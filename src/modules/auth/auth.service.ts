@@ -29,7 +29,7 @@ export class AuthService {
     })
     const token = this.generateToken(user.id, user.email)
     return {
-      accessToken: token,
+      token,
       user: {
         id: user.id,
         name: user.name,
@@ -53,7 +53,7 @@ export class AuthService {
 
     const token = this.generateToken(user.id, user.email)
     return {
-      accessToken: token,
+      token,
       user: {
         id: user.id,
         name: user.name,

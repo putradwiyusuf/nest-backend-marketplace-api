@@ -11,19 +11,15 @@ export class ResponseInterceptor implements NestInterceptor {
     intercept(context: ExecutionContext, next: CallHandler) {
         return next.handle().pipe(
             map((data) => {
-                // kalau sudah ada success, biarkan
                 if (data?.success !== undefined) return data
 
-                return {
-                    success: true,
-                    data,
-                    meta: null,
-                }
-            }), map((data) => {
-                if (data?.success !== undefined) return data
-
-                // 🔥 FIX: kalau ada data + meta
-                if (data?.data && data?.meta) {
+                // 🔥 FIX: flatten kalau ada data + meta
+                if (
+                    data &&
+                    typeof data === 'object' &&
+                    'data' in data &&
+                    'meta' in data
+                ) {
                     return {
                         success: true,
                         data: data.data,
@@ -36,7 +32,7 @@ export class ResponseInterceptor implements NestInterceptor {
                     data,
                     meta: null,
                 }
-            }),
+            })
         )
     }
 }
