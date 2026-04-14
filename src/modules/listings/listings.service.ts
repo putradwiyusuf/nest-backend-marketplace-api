@@ -1,9 +1,17 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ImageService } from './image/image.service';
 import { QueryListingDto } from './dto/query-listing.dto';
 import { CreateListingDto } from './dto/create-listing.dto';
 import { UpdateListingDto } from './dto/update-listing.dto';
+import { Prisma } from '@prisma/client';
+import {
+    BadRequestException,
+    ForbiddenException,
+    NotFoundException,
+} from '@nestjs/common'
+
 
 @Injectable()
 export class ListingsService {
@@ -17,7 +25,7 @@ export class ListingsService {
     }
     // CREATE LISTING
     async create(userId: string, dto: CreateListingDto) {
-        return this.prisma.listing.create({
+        const listing = await this.prisma.listing.create({
             data: {
                 title: dto.title,
                 description: dto.description,
@@ -26,30 +34,52 @@ export class ListingsService {
                 locationId: dto.locationId,
                 userId,
             },
-        });
+        })
+
+        return listing
     }
 
-    // GET ALL LISTINGS 
     async findAll(query: QueryListingDto) {
-        const page = Number(query.page) || 1
-        const limit = Number(query.limit) || 10
+        const page = query.page || 1
+        const limit = query.limit || 10
         const skip = (page - 1) * limit
 
-        const where = {
-            AND: [
-                query.search
-                    ? {
-                        OR: [
-                            { title: { contains: query.search, mode: 'insensitive' } },
-                            { description: { contains: query.search, mode: 'insensitive' } },
-                        ],
-                    }
-                    : {},
-                query.categoryId ? { categoryId: query.categoryId } : {},
-                query.minPrice ? { price: { gte: Number(query.minPrice) } } : {},
-                query.maxPrice ? { price: { lte: Number(query.maxPrice) } } : {},
-                { deletedAt: null },
-            ],
+        const where: Prisma.ListingWhereInput = {
+            deletedAt: null,
+        }
+
+        // 🔍 SEARCH
+        if (query.search) {
+            where.OR = [
+                {
+                    title: {
+                        contains: query.search,
+                        mode: Prisma.QueryMode.insensitive,
+                    },
+                },
+                {
+                    description: {
+                        contains: query.search,
+                        mode: Prisma.QueryMode.insensitive,
+                    },
+                },
+            ]
+        }
+
+        // 🏷️ CATEGORY
+        if (query.categoryId) {
+            where.categoryId = query.categoryId
+        }
+
+        // 💰 PRICE
+        if (query.minPrice || query.maxPrice) {
+            where.price = {}
+            if (query.minPrice) {
+                where.price.gte = query.minPrice
+            }
+            if (query.maxPrice) {
+                where.price.lte = query.maxPrice
+            }
         }
 
         const [listings, total] = await Promise.all([
@@ -73,8 +103,10 @@ export class ListingsService {
                 id: item.id,
                 title: item.title,
                 price: item.price,
-                thumbnail: primary?.url || null,
-                location: item.location?.name || null,
+                thumbnail: primary?.url || '/uploads/default.webp',
+                location: item.location
+                    ? `${item.location.city}, ${item.location.province}`
+                    : null,
                 createdAt: item.createdAt,
                 viewsCount: item.viewsCount,
             }
@@ -135,32 +167,27 @@ export class ListingsService {
 
     // DETAIL LISTING
     async findOne(id: string) {
-        const listing = await this.prisma.listing.findFirst({
-            where: {
-                id,
-                deletedAt: null,
+        const listing = await this.prisma.listing.update({
+            where: { id },
+            data: {
+                viewsCount: { increment: 1 },
             },
             include: {
-                images: true,
+                images: {
+                    orderBy: { isPrimary: 'desc' },
+                },
                 user: true,
                 location: true,
                 category: true,
             },
         })
 
-        if (!listing) {
+        if (!listing || listing.deletedAt) {
             throw new NotFoundException('Listing not found')
         }
 
-        // 🔥 increment view
-        await this.prisma.listing.update({
-            where: { id },
-            data: {
-                viewsCount: { increment: 1 },
-            },
-        })
+        const primary = listing.images[0]
 
-        const primary = listing.images.find((img) => img.isPrimary)
 
         return {
             id: listing.id,
@@ -168,7 +195,7 @@ export class ListingsService {
             description: listing.description,
             price: listing.price,
 
-            thumbnail: primary?.url || null,
+            thumbnail: primary?.url || '/uploads/default.webp',
             gallery: listing.images.map((img) => img.url),
 
             user: {
@@ -178,11 +205,12 @@ export class ListingsService {
                     ? listing.user.phone
                     : null,
             },
-
-            location: listing.location?.name || null,
+            location: listing.location
+                ? `${listing.location.city}, ${listing.location.province}`
+                : null,
             category: listing.category?.name || null,
 
-            viewsCount: listing.viewsCount + 1,
+            viewsCount: listing.viewsCount,
             createdAt: listing.createdAt,
         }
     }
@@ -197,11 +225,8 @@ export class ListingsService {
 
     // DELETE (soft delete)
     async remove(id: string) {
-        return this.prisma.listing.update({
-            where: { id },
-            data: {
-                deletedAt: new Date(),
-            },
-        });
+        return {
+            message: 'Listing deleted',
+        }
     }
 }

@@ -5,7 +5,7 @@ import { ValidationPipe } from '@nestjs/common'
 import { NestExpressApplication } from '@nestjs/platform-express'
 import { join } from 'path'
 import { HttpExceptionFilter } from './common/filters/http-exception.filter'
-import { ResponseInterceptor } from './common/utils/response.interceptor'
+import { ResponseInterceptor } from './common/interceptor/response.intereptor'
 
 
 async function bootstrap() {

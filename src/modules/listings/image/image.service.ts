@@ -84,10 +84,16 @@ export class ImageService {
 
         await this.prisma.image.createMany({ data: imageData })
 
-        return this.prisma.image.findMany({
+        const images = await this.prisma.image.findMany({
             where: { listingId },
             orderBy: { isPrimary: 'desc' },
         })
+
+        return images.map((img) => ({
+            id: img.id,
+            url: img.url,
+            isPrimary: img.isPrimary,
+        }))
     }
 
     async deleteImage(imageId: string, userId: string) {
@@ -153,9 +159,12 @@ export class ImageService {
             data: { isPrimary: false },
         })
 
-        return this.prisma.image.update({
+        const updatePrimary = this.prisma.image.update({
             where: { id: imageId },
             data: { isPrimary: true },
         })
+
+        return updatePrimary
+
     }
 }

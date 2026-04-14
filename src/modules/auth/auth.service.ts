@@ -7,6 +7,8 @@ import { Injectable, UnauthorizedException } from '@nestjs/common'
 import { PrismaService } from 'src/prisma/prisma.service'
 import * as bcrypt from 'bcrypt'
 import { JwtService } from '@nestjs/jwt'
+import { RegisterDto } from './dto/register.dto'
+import { LoginDto } from './dto/login.dto'
 
 @Injectable()
 export class AuthService {
@@ -15,7 +17,7 @@ export class AuthService {
     private jwt: JwtService,
   ) { }
 
-  async register(dto: any) {
+  async register(dto: RegisterDto) {
     const hashedPassword = await bcrypt.hash(dto.password, 10)
 
     const user = await this.prisma.user.create({
@@ -25,11 +27,20 @@ export class AuthService {
         password: hashedPassword,
       },
     })
-
-    return this.generateToken(user.id, user.email)
+    const token = this.generateToken(user.id, user.email)
+    return {
+      accessToken: token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone || null,
+        isShownPhone: user.isShownPhone || false,
+      },
+    }
   }
 
-  async login(dto: any) {
+  async login(dto: LoginDto) {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
     })
@@ -40,7 +51,17 @@ export class AuthService {
 
     if (!isMatch) throw new UnauthorizedException('Invalid credentials')
 
-    return this.generateToken(user.id, user.email)
+    const token = this.generateToken(user.id, user.email)
+    return {
+      accessToken: token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        isShownPhone: user.isShownPhone,
+      },
+    }
   }
 
   private generateToken(userId: string, email: string) {
